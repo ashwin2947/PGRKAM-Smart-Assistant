@@ -1,0 +1,22 @@
+# --- Core API Framework ---
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.6.0
+python-dotenv>=1.0.1
+python-multipart          # Required for processing file uploads (audio/PDFs)
+
+# --- AI & NLU Layers ---
+gliner>=0.1.5             # State-of-the-art Zero-shot Entity Extraction
+spacy>=3.7.2              # Standard NLP tasks (Tokenization)
+sarvamai                  # Official SDK for Sarvam AI (LLM & Speech)
+
+# --- RAG & Retrieval ---
+rank-bm25>=0.2.2          # Sparse retrieval (Keyword search)
+chromadb>=0.4.22          # Vector Database (Local)
+sentence-transformers>=2.3.1  # Required for BGE-M3 (Dense Embeddings)
+langchain>=0.1.5          # Orchestration utilities
+langchain-community       # Community extensions for LangChain
+
+# --- Utilities ---
+requests>=2.31.0          # For HTTP calls (if not using SDKs)
+numpy>=1.26.0             # Math operations for vector scores

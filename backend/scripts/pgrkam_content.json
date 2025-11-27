@@ -1,0 +1,57 @@
+{
+  "schemes": [
+    {
+      "title": "Punjab Ghar Ghar Rozgar Scheme",
+      "description": "Employment generation scheme for Punjab residents",
+      "type": "scheme"
+    },
+    {
+      "title": "Skill Development Program",
+      "description": "Free skill training for unemployed youth",
+      "type": "scheme"
+    },
+    {
+      "title": "Self Employment Scheme",
+      "description": "Financial assistance for starting own business",
+      "type": "scheme"
+    },
+    {
+      "title": "Women Empowerment Scheme",
+      "description": "Special employment opportunities for women",
+      "type": "scheme"
+    },
+    {
+      "title": "Rural Employment Guarantee",
+      "description": "Guaranteed employment in rural areas",
+      "type": "scheme"
+    }
+  ],
+  "training_programs": [
+    {
+      "title": "Computer Training Program",
+      "description": "Basic computer skills training",
+      "type": "training"
+    },
+    {
+      "title": "Vocational Training",
+      "description": "Trade-specific skill development",
+      "type": "training"
+    },
+    {
+      "title": "Digital Literacy Program",
+      "description": "Digital skills for modern workplace",
+      "type": "training"
+    },
+    {
+      "title": "Entrepreneurship Development",
+      "description": "Business skills and startup training",
+      "type": "training"
+    },
+    {
+      "title": "Technical Skills Training",
+      "description": "Industry-specific technical training",
+      "type": "training"
+    }
+  ],
+  "news_updates": []
+}
