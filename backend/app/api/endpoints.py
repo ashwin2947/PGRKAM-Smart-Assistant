@@ -75,8 +75,9 @@ async def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks)
             print(f"Translated query: {query_for_processing}")
         
         # Step 1: NLU Layer (always in English)
-        intent = predict_intent(query_for_processing)
-        entities = []  # Simplified for now
+        intent = predict_intent(query_for_processing, history=payload.history)
+        from app.nlu.entity_extractor import extract_entities
+        entities = extract_entities(query_for_processing, use_fast=True)  # Use fast extraction
         
         # Step 2: Retrieval Layer (always in English)
         top_docs = hybrid_search(query_for_processing, top_k=3)
@@ -115,7 +116,7 @@ async def chat_endpoint(payload: ChatRequest, background_tasks: BackgroundTasks)
             original_language=payload.language,
             meta={
                 "intent": intent,
-                "entities": entities,
+                "entities": [e['text'] for e in entities],  # Simplified for response
                 "sources": [doc['source'] for doc in top_docs],
                 "processing_time": process_time,
                 "translated_query": query_for_processing if payload.language == "pa" else None

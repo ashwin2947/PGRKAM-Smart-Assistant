@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import type { ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
 
 import {
   Bot,
@@ -48,7 +50,7 @@ const translations: Record<LanguageCode, TranslationStrings> = {
     example1: "Government jobs in Punjab",
     example2: "Skill development courses",
     example3: "Self-employment schemes",
-    voiceError: "🎤 Voice input requires Chrome browser",
+    voiceError: "🎤 Voice input requires Chrome/Edge browser with microphone access",
     micError: "⚠️ Microphone error:",
     greeting:
       "Welcome to PGRKAM! 🙏\n\nI can help you with:\n• Government & Private Job Listings\n• Skill Development Programs\n• Self-Employment Schemes\n• Job Fair Information\n• Career Counseling\n\nHow can I assist you today?",
@@ -66,7 +68,7 @@ const translations: Record<LanguageCode, TranslationStrings> = {
     example1: "ਪੰਜਾਬ ਵਿੱਚ ਸਰਕਾਰੀ ਨੌਕਰੀਆਂ",
     example2: "ਹੁਨਰ ਵਿਕਾਸ ਕੋਰਸ",
     example3: "ਸਵੈ-ਰੁਜ਼ਗਾਰ ਯੋਜਨਾਵਾਂ",
-    voiceError: "🎤 ਵੌਇਸ ਇਨਪੁਟ ਲਈ ਕ੍ਰੋਮ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਲੋੜ ਹੈ",
+    voiceError: "🎤 ਵੌਇਸ ਇਨਪੁਟ ਲਈ ਕ੍ਰੋਮ/ਐਜ ਬ੍ਰਾਊਜ਼ਰ ਅਤੇ ਮਾਈਕ ਦੀ ਲੋੜ ਹੈ",
     micError: "⚠️ ਮਾਈਕ੍ਰੋਫੋਨ ਗਲਤੀ:",
     greeting:
       "ਪੀ.ਜੀ.ਆਰ.ਕੇ.ਏ.ਐਮ ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ! 🙏\n\nਮੈਂ ਤੁਹਾਡੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ:\n• ਸਰਕਾਰੀ ਅਤੇ ਪ੍ਰਾਈਵੇਟ ਨੌਕਰੀਆਂ\n• ਹੁਨਰ ਵਿਕਾਸ ਪ੍ਰੋਗਰਾਮ\n• ਸਵੈ-ਰੁਜ਼ਗਾਰ ਯੋਜਨਾਵਾਂ\n• ਰੋਜ਼ਗਾਰ ਮੇਲੇ ਦੀ ਜਾਣਕਾਰੀ\n• ਕੈਰੀਅਰ ਸਲਾਹ\n\nਮੈਂ ਅੱਜ ਤੁਹਾਡੀ ਕਿਵੇਂ ਸਹਾਇਤਾ ਕਰ ਸਕਦਾ ਹਾਂ?",
@@ -145,8 +147,14 @@ function Bubble({ role, children, isNew }: BubbleProps) {
             : "bg-gradient-to-br from-orange-500 to-amber-600 text-white ml-auto border-2 border-orange-400/30"
         }`}
       >
-        <div className="text-[15px] leading-relaxed whitespace-pre-wrap">
-          {children}
+        <div className="text-[15px] leading-relaxed">
+          {isAssistant ? (
+            <ReactMarkdown className="prose prose-sm max-w-none">
+              {children as string}
+            </ReactMarkdown>
+          ) : (
+            <div className="whitespace-pre-wrap">{children}</div>
+          )}
         </div>
       </div>
 
@@ -166,19 +174,29 @@ function useSpeechRecognition(language: LanguageCode) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const R =
+    // Check for SpeechRecognition API availability
+    const SpeechRecognition = 
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
-    if (!R) {
+    
+    if (!SpeechRecognition) {
       setSupported(false);
+      console.warn('SpeechRecognition API not available. Use Chrome/Edge browser.');
       return;
     }
-    const rec: SpeechRecognition = new R();
-    rec.lang = language === "pa" ? "pa-IN" : "en-IN";
-    rec.interimResults = true;
-    rec.maxAlternatives = 1;
-    recognitionRef.current = rec;
-    setSupported(true);
+    
+    try {
+      const rec: SpeechRecognition = new SpeechRecognition();
+      rec.lang = language === "pa" ? "pa-IN" : "en-IN";
+      rec.interimResults = true;
+      rec.maxAlternatives = 1;
+      rec.continuous = false;
+      recognitionRef.current = rec;
+      setSupported(true);
+    } catch (err) {
+      console.error('Failed to initialize SpeechRecognition:', err);
+      setSupported(false);
+    }
   }, [language]);
 
   const start = ({
@@ -265,20 +283,53 @@ export default function PGRKAMChatbot() {
 
   const t = translations[language];
 
-  // Initialize with greeting in current language and store language preference
-  useEffect(() => {
-    setMessages([{ role: "assistant", content: t.greeting }]);
-    // Store language preference in session storage
-    sessionStorage.setItem('pgrkam_language', language);
-  }, [language]);
-
-  // Load language preference on component mount
+  // Load session data on component mount
   useEffect(() => {
     const savedLanguage = sessionStorage.getItem('pgrkam_language') as LanguageCode;
+    const savedSessionId = sessionStorage.getItem('pgrkam_session_id');
+    const savedMessages = sessionStorage.getItem('pgrkam_messages');
+    
     if (savedLanguage && savedLanguage !== language) {
       setLanguage(savedLanguage);
     }
+    
+    if (savedSessionId) {
+      setSessionId(savedSessionId);
+    }
+    
+    // Restore previous conversation if exists and is recent (within 1 hour)
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        const lastMessageTime = parsedMessages[parsedMessages.length - 1]?.timestamp;
+        if (lastMessageTime && new Date().getTime() - new Date(lastMessageTime).getTime() < 3600000) {
+          setMessages(parsedMessages);
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to restore messages:', e);
+      }
+    }
+    
+    // Initialize with greeting if no recent conversation
+    setMessages([{ role: "assistant", content: t.greeting, timestamp: new Date().toISOString() }]);
   }, []);
+
+  // Update greeting when language changes (but preserve conversation)
+  useEffect(() => {
+    sessionStorage.setItem('pgrkam_language', language);
+    // Only update greeting if it's the first message
+    if (messages.length === 1 && messages[0].role === 'assistant') {
+      setMessages([{ role: "assistant", content: t.greeting, timestamp: new Date().toISOString() }]);
+    }
+  }, [language, t.greeting]);
+
+  // Save messages to session storage for persistence
+  useEffect(() => {
+    if (messages.length > 0) {
+      sessionStorage.setItem('pgrkam_messages', JSON.stringify(messages));
+    }
+  }, [messages]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -287,33 +338,45 @@ export default function PGRKAMChatbot() {
     }
   }, [messages, loading]);
 
-  const onSend = useCallback(async () => {
+  const onSend = useCallback(async (retryCount = 0) => {
     const text = value.trim();
     if (!text || loading) return;
+    
+    // Store text before clearing input to avoid race conditions
+    const messageText = text;
     
     // Clear any previous errors
     setError({ hasError: false, message: "", type: null });
     
-    // Add user message
-    const userMessage: Message = {
-      role: "user",
-      content: text,
-      timestamp: new Date().toISOString()
-    };
-    setMessages((m) => [...m, userMessage]);
-    setValue("");
+    // Add user message and clear input FIRST (synchronously)
+    if (retryCount === 0) {
+      const userMessage: Message = {
+        role: "user",
+        content: messageText,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Update state synchronously
+      setMessages(prevMessages => [...prevMessages, userMessage]);
+      setValue("");
+    }
+    
+    // Set loading after message is added
     setLoading(true);
 
     try {
       const requestBody = {
-        message: text,
+        message: messageText,
         language: language,
         session_id: sessionId || sessionStorage.getItem('pgrkam_session_id') || undefined,
-        history: messages.slice(-4).map(m => ({
+        history: messages.slice(-8).map(m => ({
           role: m.role === "assistant" ? "assistant" : "user",
           content: m.content
         }))
       };
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
@@ -322,7 +385,10 @@ export default function PGRKAMChatbot() {
           "Accept": "application/json"
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -355,18 +421,25 @@ export default function PGRKAMChatbot() {
     } catch (err: any) {
       console.error('Chat error:', err);
       
+      // Retry logic for network errors
+      if (retryCount < 2 && (err.name === 'AbortError' || err.name === 'TypeError' || err.message.includes('fetch'))) {
+        console.log(`Retrying request (attempt ${retryCount + 1})...`);
+        setTimeout(() => onSend(retryCount + 1), 1000 * (retryCount + 1)); // Exponential backoff
+        return;
+      }
+      
       // Determine error type
       let errorType: ErrorState['type'] = 'server';
       let errorMessage = err.message || 'Unknown error occurred';
       
-      if (err.name === 'TypeError' || errorMessage.includes('fetch')) {
+      if (err.name === 'TypeError' || err.name === 'AbortError' || errorMessage.includes('fetch')) {
         errorType = 'network';
         errorMessage = 'Network connection failed. Please check your internet connection.';
       }
       
       setError({ hasError: true, message: errorMessage, type: errorType });
       
-      // Add error message to chat
+      // Add error message to chat only after all retries failed
       const errorMessages = {
         en: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
         pa: "ਮਾਫ਼ ਕਰਨਾ, ਮੈਨੂੰ ਹੁਣ ਜੁੜਨ ਵਿੱਚ ਸਮੱਸਿਆ ਹੋ ਰਹੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -383,16 +456,17 @@ export default function PGRKAMChatbot() {
     } finally {
       setLoading(false);
     }
-  }, [value, loading, language, sessionId]);
+  }, [value, loading, language, sessionId, messages]);
 
   const onReset = useCallback(() => {
     setMessages([{ role: "assistant", content: t.greeting, timestamp: new Date().toISOString() }]);
     setValue("");
     setError({ hasError: false, message: "", type: null });
     if (listening) stop();
-    // Clear session but keep language preference
+    // Clear session and conversation history but keep language preference
     setSessionId("");
     sessionStorage.removeItem('pgrkam_session_id');
+    sessionStorage.removeItem('pgrkam_messages');
   }, [t.greeting, listening, stop]);
 
   return (
@@ -525,10 +599,14 @@ export default function PGRKAMChatbot() {
                 disabled={loading}
               />
               <button
-                onClick={onSend}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onSend();
+                }}
                 disabled={loading || !value.trim()}
                 className="absolute right-1.25 bottom-1.25 h-10 w-10 rounded-lg grid place-items-center transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-br from-orange-500 to-amber-600 hover:shadow-lg hover:scale-105 active:scale-95 border-2 border-orange-400/50"
                 aria-label={t.send}
+                type="button"
               >
                 <Send className="w-4 h-4 text-white" />
               </button>
