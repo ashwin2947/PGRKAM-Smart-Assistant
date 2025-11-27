@@ -42,9 +42,16 @@ pip install -r requirements.txt
 ```
 
 ### 3. Environment Configuration
-Create `backend/.env` file:
+Copy and configure environment file:
+```bash
+cd backend
+cp .env.example .env
+# Edit .env and add your Sarvam AI API key
+```
+
+Update `backend/.env` with your credentials:
 ```env
-SARVAM_API_KEY=your_sarvam_api_key_here
+SARVAM_API_KEY=your_actual_sarvam_api_key
 MONGODB_URI=mongodb://localhost:27017
 DB_NAME=pgrkam
 ```
